@@ -1,49 +1,36 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
-import { prisma } from "@/lib/prisma";
-import { createToken, setSessionCookie } from "@/lib/auth";
-import { z } from "zod";
 
-const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1),
-});
+const prisma = new PrismaClient();
 
-export async function POST(request: NextRequest) {
+export async function POST(req: Request) {
   try {
-    const body = await request.json();
-    const { email, password } = loginSchema.parse(body);
+    const { email, password } = await req.json();
 
-    const admin = await prisma.admin.findUnique({ where: { email } });
-    if (!admin) {
-      return NextResponse.json(
-        { error: "Invalid credentials" },
-        { status: 401 }
-      );
-    }
-
-    const valid = await bcrypt.compare(password, admin.password);
-    if (!valid) {
-      return NextResponse.json(
-        { error: "Invalid credentials" },
-        { status: 401 }
-      );
-    }
-
-    const token = await createToken(admin.id);
-    setSessionCookie(token);
-
-    return NextResponse.json({
-      success: true,
-      admin: { id: admin.id, email: admin.email, name: admin.name },
+    const user = await prisma.user.findUnique({
+      where: { email },
     });
-  } catch (error) {
-    if (error instanceof z.ZodError) {
+
+    if (!user) {
       return NextResponse.json(
-        { error: "Invalid input", details: error.errors },
-        { status: 400 }
+        { error: "User not found" },
+        { status: 401 }
       );
     }
+
+    const isValid = await bcrypt.compare(password, user.password);
+
+    if (!isValid) {
+      return NextResponse.json(
+        { error: "Invalid password" },
+        { status: 401 }
+      );
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("LOGIN ERROR:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
