@@ -1,0 +1,61 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum LicenseStatus {
+  active
+  expired
+  suspended
+}
+
+enum Plan {
+  basic
+  pro
+}
+
+model Admin {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("admins")
+}
+
+model Client {
+  id               String    @id @default(cuid())
+  email            String    @unique
+  name             String?
+  stripeCustomerId String?   @unique @map("stripe_customer_id")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  licenses         License[]
+
+  @@map("clients")
+}
+
+model License {
+  id             String        @id @default(cuid())
+  licenseKey     String        @unique @map("license_key")
+  domain         String
+  status         LicenseStatus @default(active)
+  plan           Plan          @default(basic)
+  expiresAt      DateTime      @map("expires_at")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+  subscriptionId String?       @map("subscription_id")
+  clientId       String?       @map("client_id")
+  client         Client?       @relation(fields: [clientId], references: [id], onDelete: SetNull)
+
+  @@index([licenseKey])
+  @@index([domain])
+  @@index([clientId])
+  @@map("licenses")
+}
